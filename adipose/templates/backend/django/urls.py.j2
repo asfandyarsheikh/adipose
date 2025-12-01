@@ -1,0 +1,16 @@
+"""URL configuration for {{ project.name }}."""
+from django.contrib import admin
+from django.urls import path, include
+from rest_framework import routers
+{% for endpoint in endpoints %}from api.views.{{ endpoint.resource }} import {{ endpoint.model }}ViewSet
+{% endfor %}
+
+router = routers.DefaultRouter()
+{% for endpoint in endpoints %}
+router.register(r'{{ endpoint.resource }}', {{ endpoint.model }}ViewSet, basename='{{ endpoint.resource }}')
+{% endfor %}
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('api/', include(router.urls)),
+]

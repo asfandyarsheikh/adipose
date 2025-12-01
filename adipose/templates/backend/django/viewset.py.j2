@@ -1,0 +1,85 @@
+"""{{ endpoint.model }} ViewSet."""
+from rest_framework import viewsets, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from django.core.paginator import Paginator
+from api.models.{{ endpoint.model | lower }} import {{ endpoint.model }}
+from api.serializers.{{ endpoint.model | lower }} import {{ endpoint.model }}Serializer
+{% if endpoint.auth_required %}from api.authentication import JWTAuthentication
+from rest_framework.permissions import IsAuthenticated{% endif %}
+
+
+class {{ endpoint.model }}ViewSet(viewsets.ModelViewSet):
+    """ViewSet for {{ endpoint.model }}."""
+    
+    queryset = {{ endpoint.model }}.objects.all()
+    serializer_class = {{ endpoint.model }}Serializer
+    {% if endpoint.auth_required %}
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    {% endif %}
+    
+    def get_queryset(self):
+        """Get filtered and sorted queryset."""
+        queryset = super().get_queryset()
+        
+        {% if endpoint.filters %}
+        # Apply filters
+        {% for filter_field in endpoint.filters %}
+        {{ filter_field }} = self.request.query_params.get('{{ filter_field }}')
+        if {{ filter_field }}:
+            queryset = queryset.filter({{ filter_field }}={{ filter_field }})
+        {% endfor %}
+        {% endif %}
+        
+        {% if endpoint.sort_fields %}
+        # Apply sorting
+        sort_by = self.request.query_params.get('sort_by')
+        if sort_by in [{% for field in endpoint.sort_fields %}'{{ field }}'{% if not loop.last %}, {% endif %}{% endfor %}]:
+            order = self.request.query_params.get('order', 'asc')
+            if order == 'desc':
+                sort_by = f'-{sort_by}'
+            queryset = queryset.order_by(sort_by)
+        {% endif %}
+        
+        return queryset
+    
+    def list(self, request, *args, **kwargs):
+        """List {{ endpoint.model }} with pagination."""
+        {% if endpoint.pagination %}
+        queryset = self.get_queryset()
+        page_size = int(request.query_params.get('page_size', {{ endpoint.page_size }}))
+        page_size = min(page_size, {{ endpoint.max_page_size }})
+        page = int(request.query_params.get('page', 1))
+        
+        paginator = Paginator(queryset, page_size)
+        page_obj = paginator.get_page(page)
+        
+        serializer = self.get_serializer(page_obj, many=True)
+        
+        return Response({
+            'results': serializer.data,
+            'count': paginator.count,
+            'page': page,
+            'page_size': page_size,
+            'total_pages': paginator.num_pages,
+        })
+        {% else %}
+        return super().list(request, *args, **kwargs)
+        {% endif %}
+    
+    {% if 'search' in endpoint.operations %}
+    @action(detail=False, methods=['get'])
+    def search(self, request):
+        """Search {{ endpoint.model }}."""
+        query = request.query_params.get('q', '')
+        if not query:
+            return Response({'results': []})
+        
+        # Implement search logic here
+        queryset = self.get_queryset()
+        # Add your search implementation
+        
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({'results': serializer.data})
+    {% endif %}

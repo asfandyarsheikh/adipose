@@ -1,0 +1,57 @@
+"""Custom middleware for {{ project.name }}."""
+from django.http import JsonResponse
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class ErrorHandlingMiddleware:
+    """Handle errors and return standardized JSON responses."""
+    
+    def __init__(self, get_response):
+        self.get_response = get_response
+    
+    def __call__(self, request):
+        return self.get_response(request)
+    
+    def process_exception(self, request, exception):
+        """Process exceptions and return JSON response."""
+        {% if error_handling.log_errors %}
+        logger.error(f"Error processing request: {str(exception)}", exc_info=True)
+        {% endif %}
+        
+        error_response = {
+            'error': {
+                'message': str(exception),
+                'type': type(exception).__name__,
+            }
+        }
+        
+        {% if error_handling.include_stack_trace %}
+        import traceback
+        error_response['error']['stack_trace'] = traceback.format_exc()
+        {% endif %}
+        
+        return JsonResponse(error_response, status=500)
+
+
+class CORSMiddleware:
+    """Handle CORS headers."""
+    
+    def __init__(self, get_response):
+        self.get_response = get_response
+    
+    def __call__(self, request):
+        response = self.get_response(request)
+        
+        {% if cors.enabled %}
+        response['Access-Control-Allow-Origin'] = '{{ cors.origins | join(", ") }}'
+        response['Access-Control-Allow-Methods'] = '{{ cors.methods | join(", ") }}'
+        response['Access-Control-Allow-Headers'] = '{{ cors.headers | join(", ") }}'
+        {% if cors.credentials %}
+        response['Access-Control-Allow-Credentials'] = 'true'
+        {% endif %}
+        response['Access-Control-Max-Age'] = '{{ cors.max_age }}'
+        {% endif %}
+        
+        return response

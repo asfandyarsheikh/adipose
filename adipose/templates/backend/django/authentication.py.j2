@@ -1,0 +1,65 @@
+"""JWT Authentication for Django."""
+import jwt
+from datetime import datetime, timedelta
+from django.conf import settings
+from rest_framework import authentication, exceptions
+from django.contrib.auth.models import User
+
+
+class JWTAuthentication(authentication.BaseAuthentication):
+    """JWT token based authentication."""
+    
+    def authenticate(self, request):
+        """Authenticate request with JWT token."""
+        auth_header = request.META.get('HTTP_{{ auth.token_header | upper | replace("-", "_") }}')
+        
+        if not auth_header:
+            return None
+        
+        try:
+            {% if auth.token_prefix %}
+            prefix, token = auth_header.split()
+            if prefix != '{{ auth.token_prefix }}':
+                raise exceptions.AuthenticationFailed('Invalid token prefix')
+            {% else %}
+            token = auth_header
+            {% endif %}
+            
+            payload = jwt.decode(
+                token,
+                settings.{{ auth.jwt_secret_env }},
+                algorithms=['{{ auth.jwt_algorithm }}']
+            )
+            
+            user_id = payload.get('user_id')
+            if not user_id:
+                raise exceptions.AuthenticationFailed('Invalid token payload')
+            
+            user = User.objects.get(id=user_id)
+            return (user, token)
+            
+        except jwt.ExpiredSignatureError:
+            raise exceptions.AuthenticationFailed('Token has expired')
+        except jwt.InvalidTokenError:
+            raise exceptions.AuthenticationFailed('Invalid token')
+        except User.DoesNotExist:
+            raise exceptions.AuthenticationFailed('User not found')
+        except Exception as e:
+            raise exceptions.AuthenticationFailed(str(e))
+    
+    @staticmethod
+    def generate_token(user):
+        """Generate JWT token for user."""
+        payload = {
+            'user_id': user.id,
+            'exp': datetime.utcnow() + timedelta(seconds={{ auth.jwt_expiry }}),
+            'iat': datetime.utcnow(),
+        }
+        
+        token = jwt.encode(
+            payload,
+            settings.{{ auth.jwt_secret_env }},
+            algorithm='{{ auth.jwt_algorithm }}'
+        )
+        
+        return token

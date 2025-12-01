@@ -1,0 +1,69 @@
+"""{{ model_name }} model."""
+from django.db import models
+{% if model.timestamps %}from django.utils import timezone{% endif %}
+
+
+class {{ model_name }}(models.Model):
+    """{{ model.description or model_name + ' model' }}."""
+    
+    {% for field_name, field in model.fields.items() %}
+    {% if field.type == 'integer' %}
+    {{ field_name }} = models.IntegerField(
+        {% if not field.required %}null=True, blank=True{% endif %}
+        {% if field.default is not none %}, default={{ field.default }}{% endif %}
+        {% if field.unique %}, unique=True{% endif %}
+    )
+    {% elif field.type == 'string' %}
+    {{ field_name }} = models.CharField(
+        max_length={{ field.max_length or 255 }}
+        {% if not field.required %}, null=True, blank=True{% endif %}
+        {% if field.default is not none %}, default='{{ field.default }}'{% endif %}
+        {% if field.unique %}, unique=True{% endif %}
+    )
+    {% elif field.type == 'text' %}
+    {{ field_name }} = models.TextField(
+        {% if not field.required %}null=True, blank=True{% endif %}
+        {% if field.default is not none %}, default='{{ field.default }}'{% endif %}
+    )
+    {% elif field.type == 'boolean' %}
+    {{ field_name }} = models.BooleanField(
+        default={{ field.default or 'False' }}
+        {% if not field.required %}, null=True, blank=True{% endif %}
+    )
+    {% elif field.type == 'datetime' %}
+    {{ field_name }} = models.DateTimeField(
+        {% if not field.required %}null=True, blank=True{% endif %}
+        {% if field.default == 'now' %}, default=timezone.now{% endif %}
+    )
+    {% elif field.type == 'float' %}
+    {{ field_name }} = models.FloatField(
+        {% if not field.required %}null=True, blank=True{% endif %}
+        {% if field.default is not none %}, default={{ field.default }}{% endif %}
+    )
+    {% elif field.foreign_key %}
+    {{ field_name }} = models.ForeignKey(
+        '{{ field.foreign_key }}',
+        on_delete=models.CASCADE,
+        related_name='{{ model_name | lower }}_set'
+        {% if not field.required %}, null=True, blank=True{% endif %}
+    )
+    {% endif %}
+    {% endfor %}
+    
+    {% if model.timestamps %}
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    {% endif %}
+    
+    {% if model.soft_delete %}
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    {% endif %}
+    
+    class Meta:
+        {% if model.table_name %}
+        db_table = '{{ model.table_name }}'
+        {% endif %}
+        ordering = ['-id']
+        
+    def __str__(self):
+        return f"{{ model_name }}(id={self.id})"

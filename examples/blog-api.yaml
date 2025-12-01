@@ -1,0 +1,134 @@
+project:
+  name: BlogAPI
+  version: 1.0.0
+  base_url: https://api.blog.com
+  description: A simple blog API example
+
+auth:
+  type: jwt
+  token_header: Authorization
+  token_prefix: Bearer
+  jwt_secret_env: JWT_SECRET
+  jwt_algorithm: HS256
+  jwt_expiry: 3600
+
+models:
+  User:
+    fields:
+      id:
+        type: integer
+        required: true
+      username:
+        type: string
+        required: true
+        min_length: 3
+        max_length: 50
+        unique: true
+      email:
+        type: string
+        required: true
+        unique: true
+      password:
+        type: string
+        required: true
+        min_length: 8
+    timestamps: true
+    description: User model for authentication
+    
+  Post:
+    fields:
+      id:
+        type: integer
+        required: true
+      title:
+        type: string
+        required: true
+        max_length: 200
+      content:
+        type: text
+        required: true
+      user_id:
+        type: integer
+        required: true
+        foreign_key: User
+      published:
+        type: boolean
+        default: false
+      views:
+        type: integer
+        default: 0
+    timestamps: true
+    description: Blog post model
+    
+  Comment:
+    fields:
+      id:
+        type: integer
+        required: true
+      post_id:
+        type: integer
+        required: true
+        foreign_key: Post
+      user_id:
+        type: integer
+        required: true
+        foreign_key: User
+      content:
+        type: text
+        required: true
+        max_length: 1000
+    timestamps: true
+    description: Comment model
+
+endpoints:
+  - resource: users
+    model: User
+    operations: [create, read, update, delete, list]
+    auth_required: true
+    pagination: true
+    page_size: 20
+    max_page_size: 100
+    filters: [username, email]
+    sort_fields: [username, created_at]
+    
+  - resource: posts
+    model: Post
+    operations: [create, read, update, delete, list, search]
+    auth_required: true
+    pagination: true
+    page_size: 20
+    max_page_size: 100
+    filters: [user_id, published]
+    sort_fields: [title, created_at, views]
+    
+  - resource: comments
+    model: Comment
+    operations: [create, read, update, delete, list]
+    auth_required: true
+    pagination: true
+    page_size: 50
+    max_page_size: 200
+    filters: [post_id, user_id]
+    sort_fields: [created_at]
+
+database:
+  type: postgresql
+  host_env: DB_HOST
+  port_env: DB_PORT
+  name_env: DB_NAME
+  user_env: DB_USER
+  password_env: DB_PASSWORD
+  migrations: true
+
+cors:
+  enabled: true
+  origins: ["*"]
+  methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
+  headers: ["*"]
+  credentials: true
+  max_age: 3600
+
+error_handling:
+  format: standard
+  include_stack_trace: false
+  log_errors: true
